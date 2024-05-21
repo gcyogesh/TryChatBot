@@ -1,4 +1,4 @@
-import React, { useState,  useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import './App.css';
 import image from './assets/bot.png';
 
@@ -14,9 +14,21 @@ const App: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const getBotResponse = (userMessage: string) => {
-    // You can add more sophisticated bot logic here
-    return userMessage;
+  const getBotResponse = async (userMessage: string) => {
+    try {
+      const response = await fetch('http://localhost:5000/send-msg', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ MSG: userMessage })
+      });
+      const data = await response.json();
+      return data.Reply;  
+    } catch (error) {
+      console.error('Error fetching bot response:', error);
+      return 'Sorry, something went wrong. Please try again later.';
+    }
   };
 
   const speak = (text: string) => {
@@ -24,15 +36,19 @@ const App: React.FC = () => {
     speechSynthesis.speak(utterance);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const input = document.getElementById("MSG") as HTMLInputElement;
     const message = input.value.trim();
     if (message) {
       const userMessage = { text: message, type: 'user' as const, profileImg: '' };
-      const botMessage = { text: getBotResponse(message), type: 'bot' as const, profileImg: image };
-      setMessages([...messages, userMessage, botMessage]);
-      speak(botMessage.text); // Make the bot speak the reply
+      setMessages((prevMessages) => [...prevMessages, userMessage]);
+
+      const botReply = await getBotResponse(message);
+      const botMessage = { text: botReply, type: 'bot' as const, profileImg: image };
+      setMessages((prevMessages) => [...prevMessages, botMessage]);
+
+      speak(botMessage.text);
       input.value = '';
     }
   };
@@ -56,11 +72,9 @@ const App: React.FC = () => {
           ))}
           <div ref={messagesEndRef}></div>
         </div>
-        <div className="suggession"></div>
       </div>
       <form className="message-box" id="mymsg" onSubmit={handleFormSubmit}>
         <input type="text" id="MSG" name="MSG" className="message-input" placeholder="Type message..." />
-        <i className="fas fa-microphone" id="start-record-btn"></i>
         <button type="submit" className="message-submit">Send</button>
       </form>
       <h3 className="no-browser-support" hidden>Sorry, Your Browser Doesn't Support the Web Speech API. Try Opening This Demo In Google Chrome.</h3>
